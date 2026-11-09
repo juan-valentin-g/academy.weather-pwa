@@ -1,23 +1,20 @@
-const API_KEY = process.env.WEATHER_API_KEY;
-const BASE_URL = "https://api.openweathermap.org/data/2.5";
-
-export async function getWeatherByCity(city) {
-  const res = await fetch(
-    `${BASE_URL}/weather?q=${city}&units=metric&lang=es&appid=${API_KEY}`
-  );
-  if (!res.ok) {
-    throw new Error("No se encontró la ciudad solicitada.");
+async function fetchWeather(params) {
+  const response = await fetch(`/api/weather?${params}`, {
+    cache: "no-store",
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || "Error al obtener el clima.");
   }
-  return res.json();
+  return data;
 }
 
+export function getWeatherByCity(city) {
+  return fetchWeather(new URLSearchParams({ city: city.trim() }));
+}
 
-export async function getWeatherByCoords(lat, lon) {
-  const res = await fetch(
-    `${BASE_URL}/weather?lat=${lat}&lon=${lon}&units=metric&lang=es&appid=${API_KEY}`
+export function getWeatherByCoords(lat, lon) {
+  return fetchWeather(
+    new URLSearchParams({ lat: String(lat), lon: String(lon) })
   );
-  if (!res.ok) {
-    throw new Error("Error al consultar el clima para tu ubicación.");
-  }
-  return res.json();
 }

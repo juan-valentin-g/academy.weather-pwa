@@ -1,22 +1,48 @@
 "use client";
-import { useState, useEffect } from "react";
-//import { getWeatherByCity, getWeatherByCoords } from "@/lib/weather";
+import { useState, useMemo, useSyncExternalStore } from "react";
 import InstallPrompt from "./components/InstallPrompt";
 import { getWeatherByCity, getWeatherByCoords } from "./lib/weather";
 
+function subscribeToWeatherCache(callback) {
+  window.addEventListener("storage", callback);
+  return () => window.removeEventListener("storage", callback);
+}
+
+function readWeatherCache() {
+  try {
+    return localStorage.getItem("last_weather");
+  } catch {
+    return null;
+  }
+}
+
+function getServerWeatherCache() {
+  return null;
+}
+
 export default function Home() {
   const [city, setCity] = useState("");
-  const [weather, setWeather] = useState(null);
+  const [currentWeather, setWeather] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
 
-  useEffect(() => {
-    const cachedWeather = localStorage.getItem("last_weather");
-    if (cachedWeather) {
-      setWeather(JSON.parse(cachedWeather));
+  const cachedWeather = useSyncExternalStore(
+    subscribeToWeatherCache,
+    readWeatherCache,
+    getServerWeatherCache
+  );
+  const savedWeather = useMemo(() => {
+    try {
+      const data = JSON.parse(cachedWeather);
+      return data?.sys && data?.main && data?.wind && data?.weather?.[0]
+        ? data
+        : null;
+    } catch {
+      return null;
     }
-  }, []);
+  }, [cachedWeather]);
+  const weather = currentWeather ?? savedWeather;
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -45,7 +71,11 @@ export default function Home() {
       const data = await apiCall();
       setWeather(data);
 
-      localStorage.setItem("last_weather", JSON.stringify(data));
+      try {
+        localStorage.setItem("last_weather", JSON.stringify(data));
+      } catch {
+        // El clima sigue disponible aunque el navegador bloquee el almacenamiento.
+      }
     } catch (err) {
       setError(err.message || "Error al obtener datos");
     } finally {
